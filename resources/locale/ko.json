@@ -88,7 +88,8 @@
         "urgent": "긴급",
         "immediate": "가장 긴급",
         "top_secret": "최고 기밀",
-        "confidential": "기밀"
+        "confidential": "기밀",
+        "sign_letter": "Sign Letter"
     },
     "action": {
         "submit": "제출",

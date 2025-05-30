@@ -88,7 +88,8 @@
         "urgent": "緊急",
         "immediate": "最優先",
         "top_secret": "極秘",
-        "confidential": "秘密"
+        "confidential": "秘密",
+        "sign_letter": "Sign Letter"
     },
     "action": {
         "submit": "送信",

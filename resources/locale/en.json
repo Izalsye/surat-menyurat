@@ -88,7 +88,8 @@
         "urgent": "Urgent",
         "immediate": "Most Urgent",
         "top_secret": "Top Secret",
-        "confidential": "Confidential"
+        "confidential": "Confidential",
+        "sign_letter": "Sign Letter"
     },
     "action": {
         "submit": "Submit",

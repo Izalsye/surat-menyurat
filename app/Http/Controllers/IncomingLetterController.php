@@ -49,6 +49,7 @@ class IncomingLetterController extends Controller
     public function store(StoreRequest $request): RedirectResponse
     {
         try {
+            $user = $request->user(); // Get user
             $input = $request->validated();
 
             if ($input['letter_date']) {
@@ -66,12 +67,22 @@ class IncomingLetterController extends Controller
                 $uploadedImage = $manager->read($request->file('file')->getPathname());
 
                 $kopPath = storage_path('app/public/kop_surat.png');
-                $kopImage = $manager->read($kopPath)->resize($uploadedImage->width());
+                if (file_exists($kopPath)) {
+                    $kopImage = $manager->read($kopPath)->resize($uploadedImage->width());
+                    $uploadedImage->place($kopImage, 'top');
+                }
 
-                $uploadedImage->place($kopImage, 'top');
+                if ($request->boolean('sign_letter') && $user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                    $signatureImage = $manager->read(Storage::disk('public')->path($user->signature_path));
+                    // Adjust size/position as needed
+                    $signatureImage->resize(250, null, function ($constraint) { // Increased size for visibility
+                        $constraint->aspectRatio();
+                    });
+                    $uploadedImage->place($signatureImage, 'bottom-right', 20, 20); // Increased padding
+                }
 
                 $filename = 'incoming_letter/' . uniqid() . '.jpg';
-                Storage::put($filename, (string) $uploadedImage->toJpeg());
+                Storage::disk('public')->put($filename, (string) $uploadedImage->toJpeg()); // Ensure 'public' disk
 
                 $input['file'] = $filename;
             } elseif ($uploadedFile->getClientOriginalExtension() === 'pdf') {
@@ -102,17 +113,44 @@ class IncomingLetterController extends Controller
                         if (file_exists($kopPath)) {
                             $pdf->Image($kopPath, 10, 5, $size['width'] - 20);
                         }
+
+                        // Add signature if requested
+                        if ($request->boolean('sign_letter') && $user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                            $sigPath = Storage::disk('public')->path($user->signature_path);
+                            try {
+                                $imgInfo = getimagesize($sigPath);
+                                if ($imgInfo) {
+                                    $pageWidth = $size['width'];
+                                    $pageHeight = $size['height'];
+                                    $signatureFileWidth = $imgInfo[0];
+                                    $signatureFileHeight = $imgInfo[1];
+                                    $aspectRatio = $signatureFileWidth / $signatureFileHeight;
+                                    
+                                    $displaySignatureWidth = 40; // mm, desired display width of signature
+                                    $displaySignatureHeight = $displaySignatureWidth / $aspectRatio;
+
+                                    // Position: bottom-right
+                                    $sigX = $pageWidth - $displaySignatureWidth - 15; // 15mm from right
+                                    $sigY = $pageHeight - $displaySignatureHeight - 15; // 15mm from bottom
+
+                                    $pdf->Image($sigPath, $sigX, $sigY, $displaySignatureWidth);
+                                }
+                            } catch (\Exception $e) {
+                                Log::error("Error getting signature image size or placing signature: " . $e->getMessage());
+                                // Optionally, inform the user or skip placing signature
+                            }
+                        }
                     }
                 }
 
                 $pdf->Output('F', $outputPath);
                 $input['file'] = $relativePath;
             } else {
-                // Default simpan langsung
-                $input['file'] = $uploadedFile->store('incoming_letter');
+                // Default simpan langsung, ensure it uses public disk if accessible via URL later
+                $input['file'] = $uploadedFile->store('incoming_letter', 'public');
             }
 
-            $input['created_by'] = $request->user()->id;
+            $input['created_by'] = $user->id; // Use the $user variable
             $letter = IncomingLetter::query()->create($input);
 
             if ($codes = $request->input('categories')) {

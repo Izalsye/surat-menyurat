@@ -9,6 +9,8 @@ import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import {
     SelectButton, Avatar, FloatLabel, Message, InputText,
     Button,
+    FileUpload,
+    Image,
 } from 'primevue';
 import { useI18n } from 'vue-i18n';
 
@@ -34,15 +36,38 @@ const form = useForm({
     name: user.name,
     email: user.email,
     locale: user.locale,
+    signature_file: null as File | null,
+    remove_signature: false,
 });
 
 const submit = () => {
-    form.patch(route('profile.update'), {
+    // Since we have a file upload, we need to use POST for multipart/form-data.
+    // Inertia's form helper will automatically include a _method: 'PATCH' field.
+    form.post(route('profile.update'), {
         preserveScroll: true,
         onSuccess: () => {
             locale.value = form.locale;
+            form.signature_file = null; // Reset file input after successful upload
+            form.remove_signature = false;
+        },
+        onError: () => {
+            // Handle errors if needed
         }
     });
+};
+
+const handleSignatureUpload = (event: { files: File[] }) => {
+    if (event.files && event.files.length > 0) {
+        form.signature_file = event.files[0];
+        form.remove_signature = false; // If a new file is uploaded, we don't want to remove it
+    }
+};
+
+const removeSignature = () => {
+    form.remove_signature = true;
+    form.signature_file = null; // Clear any selected file
+    // Optionally, immediately hide the preview or update UI
+    // This will be handled by the v-if on the Image component based on user.signature_url and form.signature_file
 };
 
 type localeType = 'id' | 'en' | 'ko' | 'ja' | 'ar' | 'zh-CN';
@@ -127,6 +152,41 @@ const locales: Locale[] = [
                                 {{ option.code }}
                             </template>
                         </SelectButton>
+                    </div>
+
+                    <div>
+                        <label for="signature" class="text-sm">{{ $t('field.signature') }}</label>
+                        <FileUpload
+                            name="signature_file"
+                            mode="basic"
+                            accept="image/*"
+                            :auto="true"
+                            :customUpload="true"
+                            @uploader="handleSignatureUpload"
+                            :chooseLabel="$t('action.choose_signature')"
+                            class="mt-2"
+                        />
+                        <Message v-if="form.errors.signature_file" severity="error" size="small" variant="simple">
+                            {{ form.errors.signature_file }}
+                        </Message>
+
+                        <div v-if="user.signature_url && !form.signature_file" class="mt-4">
+                            <p class="text-sm mb-2">{{ $t('label.current_signature') }}:</p>
+                            <Image :src="user.signature_url" alt="Current Signature" width="150" preview />
+                            <Button
+                                type="button"
+                                severity="danger"
+                                size="small"
+                                :label="$t('action.remove_signature')"
+                                @click="removeSignature"
+                                class="mt-2"
+                                :disabled="form.processing"
+                            />
+                        </div>
+                         <div v-if="form.signature_file" class="mt-4">
+                            <p class="text-sm mb-2">{{ $t('label.new_signature_preview') }}:</p>
+                            <Image :src="Object.createObjectURL(form.signature_file)" alt="New Signature Preview" width="150" preview />
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-4">

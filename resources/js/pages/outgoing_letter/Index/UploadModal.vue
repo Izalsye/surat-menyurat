@@ -35,6 +35,7 @@ const form = useForm<{
     categories: string[];
     disposition_id: string | null;
     incoming_letter_id: string | null;
+    sign_letter: boolean;
 }>({
     body: '',
     is_draft: false,
@@ -47,6 +48,7 @@ const form = useForm<{
     categories: [],
     disposition_id: null,
     incoming_letter_id: null,
+    sign_letter: false,
 });
 
 const open = (dispositionId: string | null = null, incomingLetterId: string | null = null) => {
@@ -284,10 +286,14 @@ defineExpose({
         </div>
 
         <div class="flex justify-between items-center">
-            <div>
+            <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2" v-if="form.file && !form.incoming_letter_id">
                     <Checkbox v-model="createMore" input-id="create_more" binary />
                     <label for="create_more">{{ $t('label.create_more') }}</label>
+                </div>
+                <div class="flex items-center gap-2" v-if="form.file">
+                    <Checkbox input-id="sign_letter" v-model="form.sign_letter" binary />
+                    <label for="sign_letter">{{ $t('label.sign_letter') }}</label>
                 </div>
             </div>
 

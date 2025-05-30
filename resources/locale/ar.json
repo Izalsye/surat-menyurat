@@ -88,7 +88,8 @@
         "urgent": "عاجل",
         "immediate": "عاجل جدًا",
         "top_secret": "سري للغاية",
-        "confidential": "سري"
+        "confidential": "سري",
+        "sign_letter": "توقيع الرسالة"
     },
     "action": {
         "submit": "إرسال",

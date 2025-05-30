@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,19 +32,42 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $user->fill($request->validated());
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        if ($request->user()->isDirty('locale')) {
-            Session::put('locale', $request->user()->locale);
+        if ($user->isDirty('locale')) {
+            Session::put('locale', $user->locale);
         }
 
-        $request->user()->save();
+        // Handle signature upload
+        if ($request->hasFile('signature_file')) {
+            // Basic validation, consider adding more specific rules in ProfileUpdateRequest if needed
+            $request->validate([
+                'signature_file' => ['image', 'max:2048'], // Example: max 2MB
+            ]);
 
-        App::setLocale($request->user()->locale);
+            // Delete old signature if exists
+            if ($user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                Storage::disk('public')->delete($user->signature_path);
+            }
+
+            // Store new signature
+            $path = $request->file('signature_file')->storeAs("signatures/{$user->id}", 'signature.' . $request->file('signature_file')->extension(), 'public');
+            $user->signature_path = $path;
+        } elseif ($request->boolean('remove_signature')) {
+            if ($user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                Storage::disk('public')->delete($user->signature_path);
+                $user->signature_path = null;
+            }
+        }
+
+        $user->save();
+
+        App::setLocale($user->locale);
 
         return to_route('profile.edit')
             ->with('success', __('action.updated', ['menu' => __('menu.profile')]));

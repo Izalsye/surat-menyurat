@@ -13,6 +13,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable
 {
@@ -32,6 +33,7 @@ class User extends Authenticatable
         'email',
         'password',
         'locale',
+        'signature_path',
     ];
 
     /**
@@ -59,11 +61,20 @@ class User extends Authenticatable
 
     protected $appends = [
         'avatar',
+        'signature_url',
     ];
 
     public function getAvatarAttribute(): string
     {
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF&background=EBF4FF';
+    }
+
+    public function getSignatureUrlAttribute(): ?string
+    {
+        if ($this->signature_path && Storage::disk('public')->exists($this->signature_path)) {
+            return Storage::disk('public')->url($this->signature_path);
+        }
+        return null;
     }
 
     public function readLetters(): BelongsToMany

@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Support\Str;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use setasign\Fpdi\Fpdi;
 
 class OutgoingLetterController extends Controller
 {
@@ -41,12 +45,93 @@ class OutgoingLetterController extends Controller
     {
         try {
             $input = $request->validated();
+            $user = $request->user(); // Get authenticated user
+
+            $uploadedFile = $input['file']; // This is an UploadedFile object
+            $originalFilePath = $uploadedFile->getPathname();
+            $mime = $uploadedFile->getMimeType();
+            $finalStoragePath = null;
+
+            $manager = new ImageManager(new GdDriver()); // Initialize ImageManager
+
+            if ($uploadedFile->getClientOriginalExtension() === 'pdf' || $mime === 'application/pdf') {
+                $pdf = new Fpdi();
+                $pageCount = $pdf->setSourceFile($originalFilePath);
+                $relativePath = 'outgoing_letter/' . Str::uuid()->toString() . '.pdf';
+                
+                // Ensure the output directory exists
+                $outputDirectory = dirname(Storage::disk('public')->path($relativePath));
+                if (!is_dir($outputDirectory)) {
+                    mkdir($outputDirectory, 0755, true);
+                }
+
+                for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                    $templateId = $pdf->importPage($pageNo);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+
+                    if ($pageNo === 1 && $request->boolean('sign_letter') && $user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                        $sigPath = Storage::disk('public')->path($user->signature_path);
+                        try {
+                            $imgInfo = getimagesize($sigPath);
+                            if ($imgInfo) {
+                                $pageWidth = $size['width'];
+                                $pageHeight = $size['height'];
+                                $signatureFileWidth = $imgInfo[0];
+                                $signatureFileHeight = $imgInfo[1];
+                                $aspectRatio = $signatureFileWidth / $signatureFileHeight;
+                                $displaySignatureWidth = 40; // mm
+                                $displaySignatureHeight = $displaySignatureWidth / $aspectRatio;
+                                $sigX = $pageWidth - $displaySignatureWidth - 15; // 15mm from right
+                                $sigY = $pageHeight - $displaySignatureHeight - 15; // 15mm from bottom
+                                $pdf->Image($sigPath, $sigX, $sigY, $displaySignatureWidth);
+                            }
+                        } catch (\Exception $e) {
+                            Log::error("Error processing signature for PDF in OutgoingLetter: " . $e->getMessage());
+                        }
+                    }
+                }
+                $pdf->Output('F', Storage::disk('public')->path($relativePath)); // Save PDF directly to storage path
+                $finalStoragePath = $relativePath;
+
+            } elseif (Str::startsWith($mime, 'image')) {
+                $processedImage = $manager->read($originalFilePath);
+                if ($request->boolean('sign_letter') && $user->signature_path && Storage::disk('public')->exists($user->signature_path)) {
+                    $signatureDiskPath = Storage::disk('public')->path($user->signature_path);
+                    $signatureImage = $manager->read($signatureDiskPath);
+                    // Resize signature before placing
+                    $signatureImage->resize(250, null, function ($constraint) { 
+                        $constraint->aspectRatio(); 
+                        $constraint->upsize(); // Prevent upsizing if signature is smaller than 250px
+                    });
+                    $processedImage->place($signatureImage, 'bottom-right', 20, 20);
+                }
+                
+                $imageExtension = $uploadedFile->getClientOriginalExtension() ?: 'jpg'; // Fallback extension
+                // Ensure the extension is valid for encoding
+                $validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'tif', 'tiff', 'bmp'];
+                if (!in_array(strtolower($imageExtension), $validExtensions)) {
+                    $imageExtension = 'jpg'; // Default to jpg if extension is unusual
+                }
+                $relativePath = 'outgoing_letter/' . Str::uuid()->toString() . '.' . $imageExtension;
+                Storage::disk('public')->put($relativePath, (string) $processedImage->encodeByExtension($imageExtension));
+                $finalStoragePath = $relativePath;
+
+            } else {
+                // Default: store original file directly to public disk
+                $finalStoragePath = $uploadedFile->store('outgoing_letter', 'public');
+            }
+
+            $input['file'] = $finalStoragePath; // Update with the new path string (relative to public disk root)
+            
             if ($input['letter_date']) {
                 $input['letter_date'] = Carbon::parse($input['letter_date']);
             }
-            $input['file'] = $input['file']->store('outgoing_letter');
-            $input['created_by'] = $request->user()->id;
+            $input['created_by'] = $user->id;
+            
             $letter = OutgoingLetter::query()->create($input);
+
             if ($codes = $request->input('categories')) {
                 $categories = LetterCategory::query()
                     ->whereIn('code', $codes)
@@ -56,24 +141,29 @@ class OutgoingLetterController extends Controller
 
             if ($request->input('disposition_id')) {
                 $disposition = Disposition::query()->find($request->input('disposition_id'));
-                $disposition->update([
-                    'is_done' => true,
-                    'done_at' => now(),
-                ]);
-                $assignee = $disposition->assignee;
-                if ($assignee) {
-                    Mail::to($assignee->email)
-                        ->queue(new DispositionDone($assignee, $disposition, $letter));
+                if ($disposition) { // Check if disposition exists
+                    $disposition->update([
+                        'is_done' => true,
+                        'done_at' => now(),
+                    ]);
+                    $assignee = $disposition->assignee;
+                    if ($assignee) {
+                        Mail::to($assignee->email)
+                            ->queue(new DispositionDone($assignee, $disposition, $letter));
+                    }
+                    $assigner = $disposition->assigner;
+                    if ($assigner) { // Check if assigner exists
+                        Mail::to($assigner->email)
+                            ->queue(new DispositionDone($assigner, $disposition, $letter));
+                    }
                 }
-                $assigner = $disposition->assigner;
-                Mail::to($assigner->email)
-                    ->queue(new DispositionDone($assigner, $disposition, $letter));
             }
 
             return back()->with('success', __('action.created', ['menu' => __('menu.outgoing_letter')]));
         } catch (\Throwable $exception) {
             Log::error($exception->getMessage());
-
+            // Add stack trace for more detailed logging if possible
+            Log::error($exception->getTraceAsString()); 
             return back()->with('error', $exception->getMessage());
         }
     }
