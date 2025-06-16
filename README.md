@@ -1,26 +1,36 @@
-# Alur Aplikasi
 ```mermaid
-flowchart TD
-    A([Buat Dokumen Internal]) --> B{Ambil Nomor Dokumen?}
-    B -- Ya --> C[Ambil dari Table Penomoran (document_numbering)]
-    B -- Tidak --> D[Generate Nomor Baru & Simpan di Penomoran]
+erDiagram
+    DOCUMENT_NUMBERING {
+        int id PK
+        string document_code
+        string description
+        datetime created_at
+    }
 
-    C --> E[Tulis Detail Dokumen Internal (internal_documents)]
-    D --> E
+    INTERNAL_DOCUMENTS {
+        int id PK
+        int document_numbering_id FK
+        string document_title
+        string document_content
+        string document_type
+        string status
+        datetime created_at
+        datetime updated_at
+    }
 
-    E --> F{Linimasa: Draft}
-    F --> G[Review Dokumen]
-    G --> H{Disetujui?}
-    H -- Tidak --> I[Revisi (Kembali ke Draft)]
-    H -- Ya --> J[Proses TTD Digital/Manual]
+    DOCUMENT_TIMELINES {
+        int id PK
+        int internal_document_id FK
+        string status
+        string note
+        datetime timestamp
+    }
 
-    J --> K{TTD Selesai?}
-    K -- Tidak --> J
-    K -- Ya --> L[Selesai / Arsipkan Dokumen]
-
-    L --> M[Tampilkan Linimasa di Frontend (document_timelines)]
-
+    DOCUMENT_NUMBERING ||--o{ INTERNAL_DOCUMENTS : "has"
+    INTERNAL_DOCUMENTS ||--o{ DOCUMENT_TIMELINES : "has"
 ```
+# Alur Aplikasi
+
 ```mermaid
 flowchart TD
     A[Login Pengguna] --> B[Dashboard]
