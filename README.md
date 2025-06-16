@@ -1,5 +1,26 @@
 # Alur Aplikasi
+```mermaid
+flowchart TD
+    A([Buat Dokumen Internal]) --> B{Ambil Nomor Dokumen?}
+    B -- Ya --> C[Ambil dari Table Penomoran (document_numbering)]
+    B -- Tidak --> D[Generate Nomor Baru & Simpan di Penomoran]
 
+    C --> E[Tulis Detail Dokumen Internal (internal_documents)]
+    D --> E
+
+    E --> F{Linimasa: Draft}
+    F --> G[Review Dokumen]
+    G --> H{Disetujui?}
+    H -- Tidak --> I[Revisi (Kembali ke Draft)]
+    H -- Ya --> J[Proses TTD Digital/Manual]
+
+    J --> K{TTD Selesai?}
+    K -- Tidak --> J
+    K -- Ya --> L[Selesai / Arsipkan Dokumen]
+
+    L --> M[Tampilkan Linimasa di Frontend (document_timelines)]
+
+```
 ```mermaid
 flowchart TD
     A[Login Pengguna] --> B[Dashboard]
