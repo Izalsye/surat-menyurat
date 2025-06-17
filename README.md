@@ -1,33 +1,106 @@
 ```mermaid
 erDiagram
-    DOCUMENT_NUMBERING {
-        int id PK
-        string document_code
-        string description
-        datetime created_at
+    USER {
+        int id
+        string nama
+        string nip
+        string jabatan
+        string unit
     }
 
-    INTERNAL_DOCUMENTS {
-        int id PK
-        int document_numbering_id FK
-        string document_title
-        string document_content
-        string document_type
+    SURAT_MASUK {
+        int id
+        string nomor_surat
+        string perihal
+        string pengirim
+        date tanggal
+        string file
         string status
-        datetime created_at
-        datetime updated_at
     }
 
-    DOCUMENT_TIMELINES {
-        int id PK
-        int internal_document_id FK
+    SURAT_KELUAR {
+        int id
+        string nomor_surat
+        string perihal
+        int penerima_id
+        date tanggal
+        string file
         string status
-        string note
-        datetime timestamp
+        int referensi_surat_masuk_id
     }
 
-    DOCUMENT_NUMBERING ||--o{ INTERNAL_DOCUMENTS : "has"
-    INTERNAL_DOCUMENTS ||--o{ DOCUMENT_TIMELINES : "has"
+    MEMO_INTERNAL {
+        int id
+        string nomor_memo
+        int pengirim_id
+        string perihal
+        text isi
+        string status
+        int referensi_memo_id
+    }
+
+    DISPOSISI {
+        int id
+        int surat_masuk_id
+        int dari_user_id
+        int ke_user_id
+        text catatan
+        date tanggal_disposisi
+        string status_disposisi
+    }
+
+    VERIFIKASI {
+        int id
+        string tipe_dokumen
+        int dokumen_id
+        int verifikator_id
+        string status
+        text catatan
+        date tanggal
+    }
+
+    LINIMASA {
+        int id
+        string tipe_dokumen
+        int dokumen_id
+        int user_id
+        string aksi
+        text catatan
+        date tanggal
+    }
+
+    ARSIP {
+        int id
+        string tipe_dokumen
+        int dokumen_id
+        date tanggal_arsip
+        text keterangan
+    }
+
+    USER ||--o{ SURAT_KELUAR : "menerima"
+    USER ||--o{ MEMO_INTERNAL : "mengirim"
+    USER ||--o{ DISPOSISI : "disposisi dari"
+    USER ||--o{ DISPOSISI : "disposisi ke"
+    USER ||--o{ VERIFIKASI : "verifikasi oleh"
+    USER ||--o{ LINIMASA : "aksi oleh"
+
+    SURAT_MASUK ||--o{ DISPOSISI : "didisposisikan"
+    SURAT_MASUK ||--o{ SURAT_KELUAR : "direferensikan oleh"
+    SURAT_MASUK ||--o{ LINIMASA : "punya linimasa"
+
+    SURAT_KELUAR ||--o{ LINIMASA : "punya linimasa"
+    MEMO_INTERNAL ||--o{ VERIFIKASI : "diverifikasi"
+    MEMO_INTERNAL ||--o{ LINIMASA : "punya linimasa"
+    MEMO_INTERNAL ||--o{ MEMO_INTERNAL : "referensi memo"
+
+    DISPOSISI ||--o{ LINIMASA : "punya linimasa"
+
+    VERIFIKASI ||--o{ LINIMASA : "punya linimasa"
+
+    SURAT_MASUK ||--o{ ARSIP : "diarsipkan"
+    SURAT_KELUAR ||--o{ ARSIP : "diarsipkan"
+    MEMO_INTERNAL ||--o{ ARSIP : "diarsipkan"
+
 ```
 # Alur Aplikasi
 
