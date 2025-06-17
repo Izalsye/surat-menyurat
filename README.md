@@ -1,381 +1,133 @@
 ```mermaid
 erDiagram
-    USER {
+    Users {
         int id
-        string nama
-        string nip
-        string jabatan
-        string unit
+        string name
+        string email
+        string password
+        string avatar
+        string sub_jabatan
     }
 
-    SURAT_MASUK {
+    kategori_umum {
         int id
-        string nomor_surat
-        string perihal
+        string code
+        string name
+        text deskripsi
+        enum type
+    }
+
+    surat_masuk {
+        int id
+        string no_surat
+        string no_agenda
+        date tgl_surat
         string pengirim
-        date tanggal
-        string file
-        string status
-    }
-
-    SURAT_KELUAR {
-        int id
-        string nomor_surat
-        string perihal
-        int penerima_id
-        date tanggal
-        string file
-        string status
-        int referensi_surat_masuk_id
-    }
-
-    MEMO_INTERNAL {
-        int id
-        string nomor_memo
-        int pengirim_id
-        string perihal
+        string instansi
+        text perihal
         text isi
+        string summary
+        string file
         string status
-        int referensi_memo_id
+        int kategori_umum_id
+        int created_by_id
     }
 
-    DISPOSISI {
+    surat_keluar {
+        int id
+        string no_surat
+        string no_agenda
+        date tgl_surat
+        string penerima
+        text instansi
+        text perihal
+        text isi
+        string summary
+        string file
+        string status
+        int kategori_umum_id
+        int created_by_id
+        int disposisi_id
+        int surat_masuk_id
+        int memo_internal_id
+    }
+
+    memo_internal {
+        int id
+        string no_surat
+        string no_agenda
+        date tgl_surat
+        string pengirim
+        string instansi
+        text perihal
+        text isi
+        string summary
+        string file
+        string status
+        int kategori_umum_id
+        int created_by_id
+        int parent_id
+    }
+
+    disposisi {
         int id
         int surat_masuk_id
-        int dari_user_id
-        int ke_user_id
-        text catatan
-        date tanggal_disposisi
-        string status_disposisi
-    }
-
-    VERIFIKASI {
-        int id
-        string tipe_dokumen
-        int dokumen_id
-        int verifikator_id
+        int pengirim_id
+        int penerima_id
+        text pesan
         string status
-        text catatan
-        date tanggal
+        enum sifat
+        boolean balasan
+        date tenggat
+        int parent_id
     }
 
-    LINIMASA {
+    disposisi_memo {
         int id
-        string tipe_dokumen
-        int dokumen_id
+        int memo_internal_id
+        int pengirim_id
+        int penerima_id
+        text pesan
+        string status
+        enum sifat
+        boolean balasan
+        date tenggat
+        int parent_id
+    }
+
+    dokumen_timeline {
+        int id
+        enum document_type
+        bigint document_id
         int user_id
-        string aksi
-        text catatan
-        date tanggal
-    }
-
-    ARSIP {
-        int id
-        string tipe_dokumen
-        int dokumen_id
-        date tanggal_arsip
+        enum action
         text keterangan
     }
 
-    USER ||--o{ SURAT_KELUAR : "menerima"
-    USER ||--o{ MEMO_INTERNAL : "mengirim"
-    USER ||--o{ DISPOSISI : "disposisi dari"
-    USER ||--o{ DISPOSISI : "disposisi ke"
-    USER ||--o{ VERIFIKASI : "verifikasi oleh"
-    USER ||--o{ LINIMASA : "aksi oleh"
+    %% Relations
+    surat_masuk ||--o{ disposisi : "has many"
+    memo_internal ||--o{ disposisi_memo : "has many"
+    Users ||--o{ disposisi : "pengirim_id / penerima_id"
+    Users ||--o{ disposisi_memo : "pengirim_id / penerima_id"
+    Users ||--o{ surat_masuk : "created_by_id"
+    Users ||--o{ surat_keluar : "created_by_id"
+    Users ||--o{ memo_internal : "created_by_id"
 
-    SURAT_MASUK ||--o{ DISPOSISI : "didisposisikan"
-    SURAT_MASUK ||--o{ SURAT_KELUAR : "direferensikan oleh"
-    SURAT_MASUK ||--o{ LINIMASA : "punya linimasa"
+    kategori_umum ||--o{ surat_masuk : "kategori_umum_id"
+    kategori_umum ||--o{ surat_keluar : "kategori_umum_id"
+    kategori_umum ||--o{ memo_internal : "kategori_umum_id"
 
-    SURAT_KELUAR ||--o{ LINIMASA : "punya linimasa"
-    MEMO_INTERNAL ||--o{ VERIFIKASI : "diverifikasi"
-    MEMO_INTERNAL ||--o{ LINIMASA : "punya linimasa"
-    MEMO_INTERNAL ||--o{ MEMO_INTERNAL : "referensi memo"
+    surat_masuk ||--o{ surat_keluar : "surat_masuk_id"
+    memo_internal ||--o{ surat_keluar : "memo_internal_id"
 
-    DISPOSISI ||--o{ LINIMASA : "punya linimasa"
+    disposisi ||--o{ surat_keluar : "disposisi_id"
 
-    VERIFIKASI ||--o{ LINIMASA : "punya linimasa"
-
-    SURAT_MASUK ||--o{ ARSIP : "diarsipkan"
-    SURAT_KELUAR ||--o{ ARSIP : "diarsipkan"
-    MEMO_INTERNAL ||--o{ ARSIP : "diarsipkan"
-
+    %% document_timeline polymorphic
+    dokumen_timeline }o--|| Users : "user_id"
+    dokumen_timeline }o--|| surat_masuk : "document_id (if surat_masuk)"
+    dokumen_timeline }o--|| surat_keluar : "document_id (if surat_keluar)"
+    dokumen_timeline }o--|| memo_internal : "document_id (if memo_internal)"
+    dokumen_timeline }o--|| disposisi : "document_id (if disposisi)"
+    dokumen_timeline }o--|| disposisi_memo : "document_id (if disposisi_memo)"
 ```
 # Alur Aplikasi
-
-```mermaid
-flowchart TD
-    A[Login Pengguna] --> B[Dashboard]
-    B --> C[Surat Masuk]
-    C --> C1[Upload Surat]
-    C1 --> C2[Ekstraksi oleh AI]
-    C2 --> C3{Hasil Ekstraksi Benar?}
-    C3 -- Ya --> C4[Simpan Surat Masuk]
-    C3 -- Tidak --> C5[Edit Manual Data Surat]
-    C5 --> C4
-
-    C4 --> D[Disposisi]
-    D --> D1[AI Saran Disposisi]
-    D1 --> D2[User Tentukan Tujuan]
-    D2 --> D3[Simpan Disposisi]
-
-    B --> E[Surat Keluar]
-    E --> E1[Tambah Surat Keluar]
-    E1 --> E2[Isi Draft Surat]
-    E2 --> E3[AI Ringkasan Surat]
-
-    B --> F[Laporan]
-    B --> G[Manajemen Pengguna]
-    G --> G1[Role Dinamis]
-    G --> G2[Permission Statis]
-
-    B --> H[Audit Trail]
-```
-
-## Sequence Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant AI
-    participant System
-    participant Database
-
-    User->>System: Login
-    System->>Database: Validasi kredensial
-    Database-->>System: Hasil validasi
-    System-->>User: Halaman Dashboard
-
-    User->>System: Upload Surat Masuk
-    System->>AI: Ekstraksi Otomatis (OCR, NLP)
-    AI-->>System: Metadata Surat (Nomor, Tanggal, Pengirim, Perihal)
-    System->>Database: Simpan Surat Masuk
-    Database-->>System: Surat Masuk Disimpan
-
-    System->>AI: Klasifikasi Surat
-    AI-->>System: Saran Kategori Surat
-    System->>Database: Simpan Kategori Surat
-    Database-->>System: Kategori Disimpan
-
-    System->>AI: Ringkasan Surat
-    AI-->>System: Ringkasan Surat
-    System->>User: Tampilkan Ringkasan Surat
-
-    User->>System: Disposisi Surat
-    System->>AI: Saran Disposisi
-    AI-->>System: Saran Disposisi
-    System->>Database: Simpan Disposisi
-    Database-->>System: Disposisi Disimpan
-
-    User->>System: Buat Surat Keluar
-    System->>AI: Ringkasan Surat Keluar
-    AI-->>System: Ringkasan Surat Keluar
-    System->>Database: Simpan Surat Keluar
-    Database-->>System: Surat Keluar Disimpan
-    System->>User: Tampilkan Ringkasan Surat Keluar
-
-    User->>System: Request Laporan
-    System->>Database: Ambil Data Surat Masuk & Keluar
-    Database-->>System: Data Laporan
-    System->>User: Tampilkan Laporan
-```
-
-### Penjelasan:
-- **User** melakukan login ke aplikasi dan mengakses halaman **Dashboard** setelah kredensial tervalidasi.
-- **User** mengunggah **Surat Masuk**, yang diproses oleh **AI** untuk ekstraksi metadata, klasifikasi, dan ringkasan surat.
-- **System** menyimpan data surat dan kategori ke dalam **Database**.
-- **User** dapat melakukan disposisi surat, dengan bantuan **AI** yang memberikan saran disposisi.
-- **User** dapat membuat **Surat Keluar**, yang juga akan diproses oleh **AI** untuk menghasilkan ringkasan surat.
-- **User** dapat meminta laporan terkait surat masuk dan keluar, yang akan diambil dari **Database** dan ditampilkan oleh **System**.
-
-
-# Database
-
-## Daftar Tabel
-
-| Tabel | Deskripsi |
-|------|-----------|
-| `users` | Data user aplikasi |
-| `sessions` | Informasi sesi login |
-| `roles`, `permissions` | Hak akses |
-| `model_has_roles`, `role_has_permissions` | Pivot untuk akses |
-| `incoming_letters` | Surat masuk |
-| `outgoing_letters` | Surat keluar |
-| `letter_categories` | Kategori surat |
-| `incoming_letter_user` | Relasi user dan surat masuk (baca) |
-| `incoming_letter_category` | Pivot surat masuk & kategori |
-| `outgoing_letter_category` | Pivot surat keluar & kategori |
-| `dispositions` | Data disposisi surat |
-
-## ERD
-```mermaid
-erDiagram
-    users {
-        BIGINT id PK
-        STRING name
-        STRING email
-        TIMESTAMP email_verified_at
-        STRING password
-        ENUM locale
-        STRING remember_token
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-    password_reset_tokens {
-        STRING email PK
-        STRING token
-        TIMESTAMP created_at
-    }
-    sessions {
-        STRING id PK
-        BIGINT user_id FK
-        STRING ip_address
-        TEXT user_agent
-        LONGTEXT payload
-        INTEGER last_activity
-    }
-
-    permissions {
-        BIGINT id PK
-        STRING name
-        STRING guard_name
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    roles {
-        BIGINT id PK
-        STRING name
-        STRING guard_name
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    model_has_roles {
-        BIGINT role_id FK
-        STRING model_type
-        BIGINT model_id
-    }
-
-    role_has_permissions {
-        BIGINT permission_id FK
-        BIGINT role_id FK
-    }
-
-    incoming_letters {
-        UUID id PK
-        STRING letter_number
-        STRING agenda_number
-        DATE letter_date
-        STRING sender
-        STRING institution
-        STRING subject
-        LONGTEXT body
-        LONGTEXT summary
-        BOOLEAN is_draft
-        STRING file
-        BIGINT created_by FK
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    incoming_letter_user {
-        UUID incoming_letter_id FK
-        BIGINT user_id FK
-        TIMESTAMP read_at
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    letter_categories {
-        BIGINT id PK
-        STRING code
-        STRING name
-        STRING description
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    incoming_letter_category {
-        BIGINT id PK
-        UUID incoming_letter_id FK
-        BIGINT letter_category_id FK
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    dispositions {
-        UUID id PK
-        UUID parent_id FK
-        UUID incoming_letter_id FK
-        BIGINT assignee_id FK
-        BIGINT assigner_id FK
-        LONGTEXT description
-        BOOLEAN is_done
-        TIMESTAMP done_at
-        BOOLEAN reply_letter
-        TIMESTAMP due_at
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    outgoing_letters {
-        UUID id PK
-        STRING letter_number
-        STRING agenda_number
-        DATE letter_date
-        STRING recipient
-        STRING subject
-        LONGTEXT body
-        LONGTEXT summary
-        BOOLEAN is_draft
-        STRING file
-        BIGINT created_by FK
-        UUID disposition_id FK
-        UUID incoming_letter_id FK
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    outgoing_letter_category {
-        BIGINT id PK
-        UUID outgoing_letter_id FK
-        BIGINT letter_category_id FK
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-
-    %% Relationships
-    users ||--o{ sessions : has
-    users ||--o{ incoming_letters : created_by
-    users ||--o{ incoming_letter_user : reads
-    users ||--o{ dispositions : assigner
-    users ||--o{ dispositions : assignee
-    users ||--o{ outgoing_letters : creates
-
-    roles ||--o{ model_has_roles : has
-    permissions ||--o{ role_has_permissions : has
-    roles ||--o{ role_has_permissions : has
-
-    incoming_letters ||--o{ incoming_letter_user : distributed_to
-    incoming_letters ||--o{ incoming_letter_category : categorized_as
-    letter_categories ||--o{ incoming_letter_category : includes
-
-    incoming_letters ||--o{ dispositions : referenced_in
-    dispositions ||--o{ dispositions : parent_of
-    dispositions ||--o{ outgoing_letters : leads_to
-
-    outgoing_letters ||--o{ outgoing_letter_category : categorized_as
-    letter_categories ||--o{ outgoing_letter_category : includes
-```
-
-* Relasi `many-to-many` diatur dengan tabel pivot seperti:
-
-    * `incoming_letter_user`
-    * `incoming_letter_category`
-    * `outgoing_letter_category`
-    * `model_has_roles`
-    * `role_has_permissions`
-* Relasi `self-referencing` pada `dispositions` (parent\_id).
-* Semua UUID ditandai, dan kolom `created_by`, `assigner_id`, `assignee_id`, dan lainnya mengikuti relasi dengan tabel `users`.
